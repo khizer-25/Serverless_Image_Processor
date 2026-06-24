@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Cloud Image Processor</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>☁️ Cloud Image Processor</h1>
+
+  <p>
+    Upload an image and AWS will automatically
+    generate optimized versions.
+  </p>
+
+  <input
+    type="file"
+    id="imageInput"
+    accept="image/*"
+  >
+
+  <button onclick="uploadImage()">
+    Upload Image
+  </button>
+
+  <div class="progress">
+
+    <div id="progressBar"></div>
+
+  </div>
+
+  <p id="message"></p>
+
+  <div id="results"></div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+
+</html>
