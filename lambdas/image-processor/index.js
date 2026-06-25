@@ -6,36 +6,28 @@ const {
   PutObjectCommand
 } = require("@aws-sdk/client-s3");
 
-const {
-  DynamoDBClient
-} = require("@aws-sdk/client-dynamodb");
-
-const {
-  DynamoDBDocumentClient,
-  PutCommand
-} = require("@aws-sdk/lib-dynamodb");
-
 const s3 = new S3Client({
   region: "us-east-1"
 });
-
-const ddb = DynamoDBDocumentClient.from(
-  new DynamoDBClient({
-    region: "us-east-1"
-  })
-);
 
 const streamToBuffer = async (stream) => {
   const chunks = [];
 
   for await (const chunk of stream) {
-    chunks.push(chunk);
+    chunks.push(
+      Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk)
+    );
   }
 
   return Buffer.concat(chunks);
 };
 
 exports.handler = async (event) => {
+
+  console.log("STEP 1: Handler Started");
+
   try {
 
     const bucket =
@@ -46,9 +38,37 @@ exports.handler = async (event) => {
         event.Records[0].s3.object.key
       );
 
-    console.log(
-      `Processing image: ${key}`
-    );
+    console.log("STEP 2: Bucket =", bucket);
+    console.log("STEP 3: Key =", key);
+
+    const extension =
+      key.split(".").pop().toLowerCase();
+
+    const supportedFormats = [
+      "jpg",
+      "jpeg",
+      "png",
+      "webp",
+      "gif",
+      "tiff",
+      "avif"
+    ];
+
+    if (!supportedFormats.includes(extension)) {
+
+      console.log(
+        "Skipping non-image file:",
+        key
+      );
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          message:
+            "Non-image file skipped"
+        })
+      };
+    }
 
     const image =
       await s3.send(
@@ -58,10 +78,17 @@ exports.handler = async (event) => {
         })
       );
 
+    console.log("STEP 4: Image Downloaded");
+
     const originalBuffer =
       await streamToBuffer(
         image.Body
       );
+
+    console.log(
+      "STEP 5: Buffer Created",
+      originalBuffer.length
+    );
 
     const baseName =
       key.substring(
@@ -69,36 +96,49 @@ exports.handler = async (event) => {
         key.lastIndexOf(".")
       );
 
-    const compressed =
+    console.log(
+      "STEP 6: Generating Variants"
+    );
+
+    const compressed = Buffer.from(
       await sharp(originalBuffer)
         .jpeg({ quality: 85 })
-        .toBuffer();
+        .toBuffer()
+    );
 
-    const low =
+    const low = Buffer.from(
       await sharp(originalBuffer)
         .jpeg({ quality: 60 })
-        .toBuffer();
+        .toBuffer()
+    );
 
-    const webp =
+    const webp = Buffer.from(
       await sharp(originalBuffer)
         .webp({ quality: 85 })
-        .toBuffer();
+        .toBuffer()
+    );
 
-    const png =
+    const png = Buffer.from(
       await sharp(originalBuffer)
         .png()
-        .toBuffer();
+        .toBuffer()
+    );
 
-    const thumbnail =
+    const thumbnail = Buffer.from(
       await sharp(originalBuffer)
         .resize(200, 200)
         .jpeg({ quality: 80 })
-        .toBuffer();
+        .toBuffer()
+    );
+
+    console.log(
+      "STEP 7: Variants Generated"
+    );
 
     const processedBucket =
       process.env.PROCESSED_BUCKET;
 
-    const uploads = [
+    const files = [
       {
         key: `${baseName}_compressed.jpg`,
         body: compressed,
@@ -126,63 +166,48 @@ exports.handler = async (event) => {
       }
     ];
 
-    for (const file of uploads) {
+    console.log(
+      "STEP 8: Uploading Variants"
+    );
+
+    for (const file of files) {
 
       await s3.send(
         new PutObjectCommand({
           Bucket: processedBucket,
           Key: file.key,
-          Body: file.body,
+
+          // Important fix for Node 24
+          Body: Uint8Array.from(file.body),
+
           ContentType: file.type
         })
       );
+
+      console.log(
+        "Uploaded:",
+        file.key
+      );
     }
 
-    await ddb.send(
-      new PutCommand({
-        TableName:
-          process.env.TABLE_NAME,
-
-        Item: {
-          imageId:
-            Date.now().toString(),
-
-          original: key,
-
-          compressed:
-            `${baseName}_compressed.jpg`,
-
-          low:
-            `${baseName}_low.jpg`,
-
-          webp:
-            `${baseName}.webp`,
-
-          png:
-            `${baseName}.png`,
-
-          thumbnail:
-            `${baseName}_thumbnail.jpg`,
-
-          uploadDate:
-            new Date()
-              .toISOString()
-        }
-      })
-    );
-
     console.log(
-      "Processing completed"
+      "STEP 9: Processing Complete"
     );
 
     return {
-      statusCode: 200
+      statusCode: 200,
+      body: JSON.stringify({
+        success: true
+      })
     };
 
-  } catch (err) {
+  } catch (error) {
 
-    console.error(err);
+    console.error(
+      "ERROR:",
+      error
+    );
 
-    throw err;
+    throw error;
   }
 };

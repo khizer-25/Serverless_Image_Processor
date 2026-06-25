@@ -1,47 +1,74 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <title>Cloud Image Processor</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="stylesheet" href="style.css">
+<title>Cloud Image Processor</title>
+
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
 <div class="container">
 
-  <h1>☁️ Cloud Image Processor</h1>
+    <h1>☁️ Cloud Image Processor</h1>
 
-  <p>
-    Upload an image and AWS will automatically
-    generate optimized versions.
-  </p>
+    <p class="subtitle">
+        
+    </p>
 
-  <input
-    type="file"
-    id="imageInput"
-    accept="image/*"
-  >
+    <div class="upload-card">
 
-  <button onclick="uploadImage()">
-    Upload Image
-  </button>
+        <div class="file-upload">
 
-  <div class="progress">
+    <input
+        type="file"
+        id="imageInput"
+        accept="image/*"
+        hidden
+    >
 
-    <div id="progressBar"></div>
+    <label
+        for="imageInput"
+        class="upload-label"
+    >
+        <div class="upload-icon">
+            📸
+        </div>
 
-  </div>
+        <h3>Select an Image</h3>
 
-  <p id="message"></p>
+        <p>
+            Click here to browse and upload
+            JPG, PNG, WEBP images
+        </p>
 
-  <div id="results"></div>
+        <span id="selectedFile">
+            No file selected
+        </span>
+    </label>
+
+</div>
+
+        <button onclick="uploadImage()">
+            Upload Image
+        </button>
+
+        <div class="progress">
+            <div id="progressBar"></div>
+        </div>
+
+        <p id="message"></p>
+
+    </div>
+
+    <div id="previewSection"></div>
 
 </div>
 
 <script src="app.js"></script>
 
 </body>
-
 </html>

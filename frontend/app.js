@@ -1,208 +1,251 @@
 const UPLOAD_API =
 "https://n15fhozm28.execute-api.us-east-1.amazonaws.com/prod/upload-url";
 
-const IMAGES_API =
-"https://n15fhozm28.execute-api.us-east-1.amazonaws.com/prod/images";
+const PROCESSED_BUCKET =
+"https://khizer-image-processed.s3.amazonaws.com";
 
 async function uploadImage() {
 
     const file =
-    document.getElementById(
-      "imageInput"
-    ).files[0];
+    document.getElementById("imageInput").files[0];
 
     const message =
-    document.getElementById(
-      "message"
-    );
+    document.getElementById("message");
 
     const progressBar =
-    document.getElementById(
-      "progressBar"
-    );
+    document.getElementById("progressBar");
 
-    if(!file){
+    const previewSection =
+    document.getElementById("previewSection");
 
+    if (!file) {
         message.innerText =
-        "Select an image first";
-
+        "Please select an image";
         return;
     }
 
-    try{
+    previewSection.innerHTML = "";
+
+    try {
+
+        message.innerText =
+        "Generating upload URL...";
 
         const response =
-        await fetch(
-          UPLOAD_API,
-          {
+        await fetch(UPLOAD_API,{
             method:"POST",
             headers:{
-              "Content-Type":
-              "application/json"
+                "Content-Type":"application/json"
             },
             body:JSON.stringify({
-              fileName:file.name,
-              contentType:file.type
+                fileName:file.name,
+                contentType:file.type
             })
-          }
-        );
+        });
 
         const data =
         await response.json();
-
-        localStorage.setItem(
-          "currentFile",
-          data.key
-        );
 
         const xhr =
         new XMLHttpRequest();
 
         xhr.upload.addEventListener(
-          "progress",
-          e=>{
+        "progress",
+        e => {
 
             if(e.lengthComputable){
 
-              const percent =
-              (e.loaded/e.total)*100;
+                const percent =
+                (e.loaded/e.total)*100;
 
-              progressBar.style.width =
-              percent + "%";
+                progressBar.style.width =
+                percent + "%";
+
+                message.innerText =
+                `Uploading ${Math.round(percent)}%`;
             }
-          }
-        );
+        });
 
-        xhr.onload = ()=>{
+        xhr.onload = () => {
 
-          if(xhr.status===200){
+            if(xhr.status === 200){
 
-            message.innerText =
-            "✅ Upload successful. Processing image...";
+                message.innerHTML = `
+                ⏳ Processing image...
+                <br>
+                `;
 
-            setTimeout(
-              loadResults,
-              5000
-            );
+                setTimeout(() => {
 
-          }else{
+                    showImages(
+                        file.name
+                    );
 
-            message.innerText =
-            "❌ Upload failed";
-          }
+                },5000);
+
+            } else {
+
+                message.innerText =
+                "Upload failed";
+            }
         };
 
         xhr.open(
-          "PUT",
-          data.uploadUrl
+            "PUT",
+            data.uploadUrl
         );
 
         xhr.setRequestHeader(
-          "Content-Type",
-          file.type
+            "Content-Type",
+            file.type
         );
 
         xhr.send(file);
 
-    }catch(error){
+    } catch(error){
 
         console.error(error);
 
         message.innerText =
-        "Something went wrong";
+        "Upload failed";
     }
 }
 
-async function loadResults(){
+async function showImages(fileName){
 
-    const fileName =
-    localStorage.getItem(
-      "currentFile"
+    const baseName =
+    fileName.substring(
+        0,
+        fileName.lastIndexOf(".")
     );
 
-    if(!fileName) return;
+    const files = [
+        {
+            title:"Compressed JPG",
+            url:`${PROCESSED_BUCKET}/${baseName}_compressed.jpg`,
+            filename:`${baseName}_compressed.jpg`
+        },
+        {
+            title:"Low Quality JPG",
+            url:`${PROCESSED_BUCKET}/${baseName}_low.jpg`,
+            filename:`${baseName}_low.jpg`
+        },
+        {
+            title:"WEBP",
+            url:`${PROCESSED_BUCKET}/${baseName}.webp`,
+            filename:`${baseName}.webp`
+        },
+        {
+            title:"PNG",
+            url:`${PROCESSED_BUCKET}/${baseName}.png`,
+            filename:`${baseName}.png`
+        },
+        {
+            title:"Thumbnail",
+            url:`${PROCESSED_BUCKET}/${baseName}_thumbnail.jpg`,
+            filename:`${baseName}_thumbnail.jpg`
+        }
+    ];
 
-    const response =
-    await fetch(
-      `${IMAGES_API}?fileName=${encodeURIComponent(fileName)}`
-    );
+    let html = `
 
-    const image =
-    await response.json();
+    <h2 class="results-title">
+        Processed Images
+    </h2>
 
-    if(!image.imageId){
+    <div class="grid">
 
-        setTimeout(
-          loadResults,
-          3000
-        );
+    `;
 
-        return;
-    }
+    files.forEach(file => {
+
+        html += `
+
+        <div class="card">
+
+            <img
+                src="${file.url}"
+                alt="${file.title}"
+            >
+
+            <h3>${file.title}</h3>
+
+            <div class="actions">
+
+                <a
+                    href="${file.url}"
+                    target="_blank"
+                    class="view-btn">
+                    Preview
+                </a>
+
+                <button
+                    class="download-btn"
+                    onclick="downloadFile(
+                    '${file.url}',
+                    '${file.filename}'
+                    )">
+                    Download
+                </button>
+
+            </div>
+
+        </div>
+
+        `;
+    });
+
+    html += `</div>`;
 
     document.getElementById(
-      "message"
+        "previewSection"
+    ).innerHTML += html;
+
+    document.getElementById(
+        "message"
+    ).innerHTML =
+    "✅ Processing Completed";
+}
+
+function downloadFile(url, filename){
+
+    fetch(url)
+    .then(response => response.blob())
+    .then(blob => {
+
+        const link =
+        document.createElement("a");
+
+        link.href =
+        URL.createObjectURL(blob);
+
+        link.download =
+        filename;
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(link.href);
+    })
+    .catch(error => {
+        console.error(error);
+    });
+}
+
+document
+.getElementById("imageInput")
+.addEventListener("change", function(){
+
+    const file =
+    this.files[0];
+
+    document.getElementById(
+        "selectedFile"
     ).innerText =
-    "✅ Processing completed";
-
-    document.getElementById(
-      "results"
-    ).innerHTML = `
-
-      <h2>Processed Variants</h2>
-
-      ${createCard(
-        image.compressed,
-        "Compressed JPEG"
-      )}
-
-      ${createCard(
-        image.low,
-        "Low Quality JPEG"
-      )}
-
-      ${createCard(
-        image.webp,
-        "WebP"
-      )}
-
-      ${createCard(
-        image.png,
-        "PNG"
-      )}
-
-      ${createCard(
-        image.thumbnail,
-        "Thumbnail"
-      )}
-
-    `;
-}
-
-function createCard(
-  url,
-  title
-){
-
-    return `
-
-    <div class="card">
-
-      <img
-        src="${url}"
-      >
-
-      <h3>${title}</h3>
-
-      <a
-        href="${url}"
-        target="_blank"
-        download
-      >
-        Download
-      </a>
-
-    </div>
-
-    `;
-}
+    file
+        ? file.name
+        : "No file selected";
+});
